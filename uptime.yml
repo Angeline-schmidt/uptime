@@ -1,0 +1,40 @@
+name: Uptime alerts
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # toutes les 5 min (GitHub peut retarder de quelques minutes)
+  workflow_dispatch:         # bouton "Run workflow" pour lancer à la main
+
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Récupérer l'état précédent
+        uses: actions/cache/restore@v4
+        with:
+          path: state.json
+          key: uptime-state-${{ github.run_id }}
+          restore-keys: uptime-state-
+
+      - name: Vérifier l'uptime
+        run: python3 check_uptime.py
+        env:
+          UPTIME_URL: ${{ secrets.UPTIME_URL }}
+          UPTIME_API_KEY: ${{ secrets.UPTIME_API_KEY }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          DISCORD_MENTION: ${{ vars.DISCORD_MENTION }}
+          LATENCY_THRESHOLD: ${{ vars.LATENCY_THRESHOLD }}
+
+      - name: Sauvegarder l'état
+        if: always() && hashFiles('state.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: state.json
+          key: uptime-state-${{ github.run_id }}
